@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+# Retrieve tmux sessions sorted by most recent activity.
+# Format: if attached, omit; otherwise include "<activity_timestamp>,<session_name>".
+# Then:
+#   - sort newest → oldest
+#   - remove blank lines
+#   - strip the timestamp, leaving only session names
+sessions=$(
+	tmux list-sessions -F '#{?session_attached,,#{session_activity},#{session_name}}' |
+		sort -r |
+		sed '/^$/d' |
+		cut -d',' -f2-
+)
+
+# Let the user pick a session interactively through fzf.
+# A live preview shows the pane contents of the highlighted session.
+# ctrl-f triggers an alternate command (`tmux-dev-session`) if desired.
+session=$(echo "$sessions" |
+	fzf \
+		--border=rounded \
+		--border-label="Switch Session" \
+		--info=inline-right \
+		--preview-label="Preview" \
+		--preview "tmux capture-pane -e -pt {}" \
+		--bind "ctrl-f:become(tmux-dev-session)"
+)
+
+# Derive a tmux-friendly session name (dots -> underscores).
+session_name=$(basename "$session" | tr . _)
+
+# Exit if the user quit without selecting anything.
+if [[ ${#session_name} -eq 0 ]]; then
+	exit
+fi
+
+# Switch to the selected tmux session.
+tmux switch-client -t "$session_name"

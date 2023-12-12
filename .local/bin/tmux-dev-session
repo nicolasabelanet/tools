@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+# Collect all immediate subdirectories in ~/dev.
+# Each directory represents a possible tmux session workspace.
+sessions="$(
+	find ~/dev -mindepth 1 -maxdepth 1 -type d
+)"
+
+# Let the user pick a directory via fzf with a preview of its structure.
+session=$(echo "$sessions" | fzf \
+	--border=rounded \
+	--info=inline-right \
+	--border-label="New Session" \
+	--preview-label="Preview" \
+	--preview "tree -CL 2 {}")
+
+# Derive a valid tmux session name from the directory name.
+session_name=$(basename "$session" | tr . _)
+
+# Exit cleanly if nothing was selected.
+if [[ ${#session} -eq 0 ]]; then
+	exit
+fi
+
+# Create the tmux session if it doesn't already exist, starting in that directory.
+if ! tmux has-session -t "$session_name" 2>/dev/null; then
+	tmux new-session -s "$session_name" -c "$session" -d
+fi
+
+# Attach (or switch) to the chosen session.
+tmux switch-client -t "$session_name"
